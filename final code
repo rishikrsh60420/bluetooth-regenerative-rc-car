@@ -1,0 +1,161 @@
+#include <SoftwareSerial.h>
+
+SoftwareSerial BT(2, 3);
+
+// Motor pins
+int in1 = 9;
+int in2 = 8;
+int enA = 10;
+
+int in3 = 7;
+int in4 = 6;
+int enB = 5;
+
+// LEDs
+int greenLED = 12;
+int redLED = 4;
+
+// Capacitor voltage input
+int capPin = A0;
+
+char cmd = 'S';
+
+unsigned long prevMillis = 0;
+bool ledState = false;
+
+void setup() {
+
+  // Motor pins
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  pinMode(enA, OUTPUT);
+
+  pinMode(in3, OUTPUT);
+  pinMode(in4, OUTPUT);
+  pinMode(enB, OUTPUT);
+
+  // LED pins
+  pinMode(greenLED, OUTPUT);
+  pinMode(redLED, OUTPUT);
+
+  // Bluetooth + Serial
+  BT.begin(9600);
+  Serial.begin(9600);
+}
+
+void loop() {
+
+  // Read Bluetooth command
+  if (BT.available()) {
+    cmd = BT.read();
+  }
+
+  unsigned long currentMillis = millis();
+
+  // =========================
+  // MOVEMENT MODE
+  // =========================
+  if (cmd == 'F' || cmd == 'B' || cmd == 'L' || cmd == 'R') {
+
+    // ---------- FORWARD ----------
+    if (cmd == 'F') {
+
+      digitalWrite(in1, HIGH);
+      digitalWrite(in2, LOW);
+
+      digitalWrite(in3, HIGH);
+      digitalWrite(in4, LOW);
+
+      analogWrite(enA, 255);
+      analogWrite(enB, 255);
+    }
+
+    // ---------- BACKWARD ----------
+    else if (cmd == 'B') {
+
+      digitalWrite(in1, LOW);
+      digitalWrite(in2, HIGH);
+
+      digitalWrite(in3, LOW);
+      digitalWrite(in4, HIGH);
+
+      analogWrite(enA, 255);
+      analogWrite(enB, 255);
+    }
+
+    // ---------- LEFT ----------
+    else if (cmd == 'L') {
+
+      analogWrite(enA, 0);
+
+      digitalWrite(in3, HIGH);
+      digitalWrite(in4, LOW);
+
+      analogWrite(enB, 255);
+    }
+
+    // ---------- RIGHT ----------
+    else if (cmd == 'R') {
+
+      digitalWrite(in1, HIGH);
+      digitalWrite(in2, LOW);
+
+      analogWrite(enA, 255);
+
+      analogWrite(enB, 0);
+    }
+
+    // Green LED blink while moving
+    if (currentMillis - prevMillis >= 300) {
+
+      prevMillis = currentMillis;
+
+      ledState = !ledState;
+
+      digitalWrite(greenLED, ledState);
+    }
+
+    digitalWrite(redLED, LOW);
+
+    // Flat line while moving
+    Serial.println(0.0);
+  }
+
+  // =========================
+  // STOP / REGENERATIVE MODE
+  // =========================
+  else {
+
+    // Free spin for regen
+    pinMode(in1, INPUT);
+    pinMode(in2, INPUT);
+
+    pinMode(in3, INPUT);
+    pinMode(in4, INPUT);
+
+    analogWrite(enA, 0);
+    analogWrite(enB, 0);
+
+    digitalWrite(greenLED, LOW);
+
+    // Red LED blink while braking
+    if (currentMillis - prevMillis >= 300) {
+
+      prevMillis = currentMillis;
+
+      ledState = !ledState;
+
+      digitalWrite(redLED, ledState);
+    }
+
+    // Read capacitor voltage
+    int raw = analogRead(capPin);
+
+    float voltage = raw * (5.0 / 1023.0);
+
+    // Send graph data
+    Serial.println(voltage);
+  }
+
+  delay(50);
+}
